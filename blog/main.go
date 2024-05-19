@@ -7,7 +7,9 @@ import (
 )
 
 type User struct {
-	Name string
+	Name string   `json:"name" zygo:"required" xml:"name"`
+	Age  int      `json:"age" validate:"min=18,max=20" xml:"age"`
+	Addr []string `json:"addr" xml:"addr"`
 }
 
 func log(next zygo.HandlerFunc) zygo.HandlerFunc {
@@ -21,6 +23,7 @@ func log(next zygo.HandlerFunc) zygo.HandlerFunc {
 func main() {
 	engine := zygo.New()
 	user := engine.Group("user")
+	user.Use(zygo.Logging)
 	user.POST("/hello", func(ctx *zygo.Context) {
 		fmt.Fprintln(ctx.W, "post hey bro!")
 	}, log)
@@ -110,6 +113,72 @@ func main() {
 		//状态会造成使用结果差别
 		id := ctx.QueryMap("user")
 		ctx.JSON(http.StatusOK, id)
+	})
+	user.POST("/formPost", func(ctx *zygo.Context) {
+		m, _ := ctx.GetPostFormMap("user")
+		ctx.JSON(http.StatusOK, m)
+	})
+	user.POST("/file", func(ctx *zygo.Context) {
+		m, _ := ctx.GetPostFormMap("user")
+		file := ctx.FormFile("file")
+		err := ctx.SaveUploadedFile(file, "./upload/"+file.Filename)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		form, err := ctx.MultipartForm()
+		fmt.Println(err)
+		dile := form.File
+		d := dile["file"]
+		for _, files := range d {
+			err = ctx.SaveUploadedFile(file, "./upload/"+files.Filename)
+		}
+		fmt.Println(err)
+		ctx.JSON(http.StatusOK, m)
+	})
+	user.POST("/files", func(ctx *zygo.Context) {
+		m, _ := ctx.GetPostFormMap("user")
+		form, err := ctx.MultipartForm()
+		fmt.Println(err)
+		dile := form.File
+		d := dile["file"]
+		for _, files := range d {
+			err = ctx.SaveUploadedFile(files, "./upload/"+files.Filename)
+		}
+		fmt.Println(err)
+		ctx.JSON(http.StatusOK, m)
+	})
+
+	user.POST("/jsonParam", func(ctx *zygo.Context) {
+		u := &User{}
+
+		ctx.DisallowUnknownFields = true
+		ctx.IsValidate = true
+		err := ctx.BindJson(u)
+		if err == nil {
+			ctx.JSON(http.StatusOK, u)
+		} else {
+			fmt.Println(err)
+		}
+	})
+	//user.POST("/jsonParamSlice", func(ctx *zygo.Context) {
+	//	u := make([]User, 0)
+	//
+	//	ctx.DisallowUnknownFields = true
+	//	ctx.IsValidate = true
+	//	err := ctx.Dealjson(&u)
+	//	if err == nil {
+	//		ctx.JSON(http.StatusOK, u)
+	//	} else {
+	//		fmt.Println(err)
+	//	}
+	//})
+
+	user.POST("/xmlParam", func(ctx *zygo.Context) {
+		user := &User{}
+		err := ctx.BindXml(user)
+		fmt.Println(err)
+		ctx.JSON(http.StatusOK, user)
 	})
 	engine.Run(":8080", nil)
 }
