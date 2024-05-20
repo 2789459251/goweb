@@ -4,6 +4,7 @@ import (
 	"html/template"
 	"net/http"
 	"sync"
+	"web/zygo/mylog"
 	"web/zygo/render"
 )
 
@@ -39,12 +40,13 @@ func (r *router) Group(name string) *routerGroup {
 		middlewaresFuncMap: make(map[string]map[string][]MiddlewareFunc),
 		treeNode:           &treeNode{name: "/", children: make([]*treeNode, 0)},
 	}
+	Group.Use(r.engine.middles...)
 	r.routerGroups = append(r.routerGroups, Group)
 	return Group
 }
 
-func (r *routerGroup) Use(middlewareFunc MiddlewareFunc) {
-	r.Middlewares = append(r.Middlewares, middlewareFunc)
+func (r *routerGroup) Use(middlewareFunc ...MiddlewareFunc) {
+	r.Middlewares = append(r.Middlewares, middlewareFunc...)
 }
 
 func (r *routerGroup) methodHandle(routerName, method string, h HandlerFunc, ctx *Context) {
@@ -67,6 +69,7 @@ func (r *routerGroup) methodHandle(routerName, method string, h HandlerFunc, ctx
 
 type router struct {
 	routerGroups []*routerGroup
+	engine       *Engine
 }
 
 //name:url method:请求方式
@@ -118,6 +121,21 @@ type Engine struct {
 	funcMap    template.FuncMap
 	HTMLRender render.HTMLRender
 	pool       sync.Pool
+	Logger     *mylog.Logger
+	middles    []MiddlewareFunc
+}
+
+func Default() *Engine {
+	engine := New()
+	engine.Use(Logging, Recovery)
+	engine.router.engine = engine
+	engine.Logger = mylog.Default()
+
+	return engine
+}
+
+func (e *Engine) Use(middles ...MiddlewareFunc) {
+	e.middles = middles
 }
 
 func New() *Engine {
@@ -151,6 +169,7 @@ func (e *Engine) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := e.pool.Get().(*Context)
 	ctx.W = w
 	ctx.R = r
+	ctx.Logger = e.Logger
 	e.httpRequestHandle(ctx, w, r)
 	e.pool.Put(ctx)
 }

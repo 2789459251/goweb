@@ -12,6 +12,7 @@ import (
 	"os"
 	"strings"
 	"web/zygo/binding"
+	"web/zygo/mylog"
 	"web/zygo/render"
 )
 
@@ -27,6 +28,7 @@ type Context struct {
 	DisallowUnknownFields bool
 	IsValidate            bool
 	StatusCode            int
+	Logger                *mylog.Logger
 }
 
 func (c *Context) initQueryCache() {
@@ -168,11 +170,9 @@ func (c *Context) String(status int, format string, values ...any) error {
 }
 
 func (c *Context) Render(status int, r render.Render) error {
+	c.W.WriteHeader(status)
 	err := r.Render(c.W)
 	c.StatusCode = status
-	if status != http.StatusOK {
-		c.W.WriteHeader(status)
-	}
 	return err
 }
 
@@ -283,6 +283,10 @@ func (c *Context) MustBindWith(obj any, binding binding.Binding) error {
 
 func (c *Context) ShouldBind(obj any, bind binding.Binding) error {
 	return bind.Bind(c.R, obj)
+}
+
+func (c *Context) Fail(code int, msg string) {
+	c.String(code, msg)
 }
 
 //func validateStruct(obj any) error {

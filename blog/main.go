@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"web/zygo"
+	log_ "web/zygo/mylog"
 )
 
 type User struct {
@@ -21,12 +22,20 @@ func log(next zygo.HandlerFunc) zygo.HandlerFunc {
 }
 
 func main() {
-	engine := zygo.New()
+	engine := zygo.Default()
 	user := engine.Group("user")
-	user.Use(zygo.Logging)
+	//user.Use(zygo.Logging)
 	user.POST("/hello", func(ctx *zygo.Context) {
+		//ctx.Logger.WithFields(mylog.Fields{
+		//	"name": "码神之路",
+		//	"id":   1000,
+		//}).Debug("我是debug日志")
+		//ctx.Logger.Info("我是info日志")
+		//ctx.Logger.Error("我是error日志")
+		//
+		//ctx.JSON(http.StatusOK, user)
 		fmt.Fprintln(ctx.W, "post hey bro!")
-	}, log)
+	})
 
 	user.GET("/hello", func(ctx *zygo.Context) {
 		fmt.Fprintln(ctx.W, "get hey bro!")
@@ -173,10 +182,28 @@ func main() {
 	//		fmt.Println(err)
 	//	}
 	//})
-
+	var u *User
+	//user.Use(zygo.Recovery)
 	user.POST("/xmlParam", func(ctx *zygo.Context) {
+		u.Age = 10
 		user := &User{}
 		err := ctx.BindXml(user)
+
+		engine.Logger.Level = log_.LevelDebug
+		//engine.Logger.Formatter = &log_.JsonFormatter{TimeDisplay: true}
+		//logger.Outs = append(logger.Outs, &log_.LoggerWriter{
+		//	Level: 2,
+		//	Out:   log_.FileWriter("./log/log.log"),
+		//})
+		engine.Logger.SetLogPath("./log")
+		engine.Logger.LogFileSize = 1 << 10 //1K
+		ctx.Logger.Debug("我是debug日志")
+		ctx.Logger.Info("我是info日志")
+		ctx.Logger.Error("我是error日志")
+		ctx.Logger.WithFields(log_.Fields{
+			"name":    "zy",
+			"emotion": "happy",
+		}).Error("这是字段测试")
 		fmt.Println(err)
 		ctx.JSON(http.StatusOK, user)
 	})

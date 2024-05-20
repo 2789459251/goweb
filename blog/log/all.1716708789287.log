@@ -1,0 +1,2 @@
+{"log_level":"INFO","log_time":"2024/05/26 - 15:33:09","msg":"我是info日志"}
+{"log_level":"ERROR","log_time":"2024/05/26 - 15:33:09","msg":"我是error日志"}
