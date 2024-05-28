@@ -116,13 +116,16 @@ func (r *routerGroup) HEAD(name string, handlerFunc HandlerFunc, middlewareFunc 
 	r.handle(name, HEAD, handlerFunc, middlewareFunc...)
 }
 
+type ErrorHandler func(err error) (int, any)
+
 type Engine struct {
 	router
-	funcMap    template.FuncMap
-	HTMLRender render.HTMLRender
-	pool       sync.Pool
-	Logger     *mylog.Logger
-	middles    []MiddlewareFunc
+	funcMap      template.FuncMap
+	HTMLRender   render.HTMLRender
+	pool         sync.Pool
+	Logger       *mylog.Logger
+	middles      []MiddlewareFunc
+	errorHandler ErrorHandler
 }
 
 func Default() *Engine {
@@ -132,6 +135,10 @@ func Default() *Engine {
 	engine.Logger = mylog.Default()
 
 	return engine
+}
+
+func (e *Engine) RegisterErrorHandler(err ErrorHandler) {
+	e.errorHandler = err
 }
 
 func (e *Engine) Use(middles ...MiddlewareFunc) {

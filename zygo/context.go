@@ -170,8 +170,9 @@ func (c *Context) String(status int, format string, values ...any) error {
 }
 
 func (c *Context) Render(status int, r render.Render) error {
-	c.W.WriteHeader(status)
-	err := r.Render(c.W)
+	//如果设置了code对Header修改不生效
+	//c.W.WriteHeader(status)
+	err := r.Render(c.W, status)
 	c.StatusCode = status
 	return err
 }
@@ -287,6 +288,15 @@ func (c *Context) ShouldBind(obj any, bind binding.Binding) error {
 
 func (c *Context) Fail(code int, msg string) {
 	c.String(code, msg)
+}
+
+func (c *Context) HandleWithError(statuscode int, obj any, err error) {
+	if err != nil {
+		code, data := c.engine.errorHandler(err)
+		c.JSON(code, data)
+		return
+	}
+	c.JSON(statuscode, obj)
 }
 
 //func validateStruct(obj any) error {

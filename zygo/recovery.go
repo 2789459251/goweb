@@ -1,10 +1,12 @@
 package zygo
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"runtime"
 	"strings"
+	"web/zygo/zyerror"
 )
 
 func detailMsg(err any) string {
@@ -24,6 +26,13 @@ func Recovery(next HandlerFunc) HandlerFunc {
 	return func(ctx *Context) {
 		defer func() {
 			if err := recover(); err != nil {
+				if err2 := err.(error); err2 != nil {
+					var myerror *zyerror.MyError
+					if errors.As(err2, &myerror) {
+						myerror.ExcuResult()
+						//return
+					}
+				}
 				ctx.Logger.Error(detailMsg(err))
 				ctx.Fail(http.StatusInternalServerError, "Internal Server Error")
 			}

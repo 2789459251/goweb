@@ -70,7 +70,7 @@ var defaultFormatter = func(params *LogFormatterParams) string {
 		params.Latency = params.Latency.Truncate(time.Second)
 	}
 	if params.IsDisplayColor {
-		return fmt.Sprintf("%s [msgo] %s |%s %v %s| %s %3d %s |%s %13v %s| %15s  |%s %-7s %s %s %#v %s \n",
+		return fmt.Sprintf("%s [zy的日志] %s |%s %v %s| %s %3d %s |%s %13v %s| %15s  |%s %-7s %s %s %#v %s \n",
 			yellow, resetColor, blue, params.TimeStamp.Format("2006/01/02 - 15:04:05"), resetColor,
 			statusCodeColor, params.StatusCode, resetColor,
 			red, params.Latency, resetColor,
@@ -79,7 +79,7 @@ var defaultFormatter = func(params *LogFormatterParams) string {
 			cyan, params.Path, resetColor,
 		)
 	}
-	return fmt.Sprintf("[msgo] %v | %3d | %13v | %15s |%-7s %#v",
+	return fmt.Sprintf("[zy的日志] %v | %3d | %13v | %15s |%-7s %#v",
 		params.TimeStamp.Format("2006/01/02 - 15:04:05"),
 		params.StatusCode,
 		params.Latency, params.ClientIP, params.Method, params.Path,

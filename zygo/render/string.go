@@ -11,8 +11,9 @@ type String struct {
 	Data   []any
 }
 
-func (s *String) Render(w http.ResponseWriter) error {
+func (s *String) Render(w http.ResponseWriter, code int) error {
 	s.WriteContentType(w)
+	w.WriteHeader(code)
 	if len(s.Data) > 0 {
 		_, err := fmt.Fprintf(w, s.Format, s.Data...)
 		return err
