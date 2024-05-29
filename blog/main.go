@@ -53,13 +53,13 @@ func main() {
 	user.GET("/hello", func(ctx *zygo.Context) {
 		fmt.Fprintln(ctx.W, "get hey bro!")
 	})
-	user.Use(func(next zygo.HandlerFunc) zygo.HandlerFunc {
-		return func(ctx *zygo.Context) {
-			fmt.Println("pre handler")
-			next(ctx)
-			fmt.Println("post handler")
-		}
-	})
+	//user.Use(func(next zygo.HandlerFunc) zygo.HandlerFunc {
+	//	return func(ctx *zygo.Context) {
+	//		fmt.Println("pre handler")
+	//		next(ctx)
+	//		fmt.Println("post handler")
+	//	}
+	//})
 
 	user.GET("/get/:id", func(ctx *zygo.Context) {
 		fmt.Fprintln(ctx.W, "get id!")
@@ -218,19 +218,19 @@ func main() {
 		//}).Error("这是字段测试")
 		//fmt.Println(err)
 		/* 统一触发recovery，处理错误*/
-		//var myerr *err_.MyError = err_.Default()
-		//myerr.Result(func(err *err_.MyError) {
-		//	ctx.Logger.Info("我在统一解决问题,我不ok")
-		//	ctx.JSON(http.StatusInternalServerError, myerr.Error())
-		//})
-		//a(1, myerr)
-		//b(1, myerr)
-		//c(1, myerr)
-		//ctx.JSON(http.StatusOK, user)
+		var myerr *err_.MyError = err_.Default()
+		myerr.Result(func(err *err_.MyError) {
+			ctx.Logger.Info("我在统一解决问题,我不ok")
+			ctx.JSON(http.StatusInternalServerError, myerr.Error())
+		})
+		a(1, myerr)
+		b(1, myerr)
+		c(1, myerr)
+		ctx.JSON(http.StatusOK, user)
 		err_ := login()
 		ctx.HandleWithError(http.StatusOK, user, err_)
 	})
-	p, _ := mypool.NewPool(5)
+	p, _ := mypool.NewPool(3)
 	user.POST("/pool", func(ctx *zygo.Context) {
 		currentTime := time.Now().UnixMilli()
 		var wg sync.WaitGroup

@@ -18,6 +18,9 @@ func (w *Worker) run() {
 
 func (w *Worker) running() {
 	for f := range w.tasks {
+		if f == nil {
+			return
+		}
 		f()
 		/*任务运行完成，worker空闲*/
 

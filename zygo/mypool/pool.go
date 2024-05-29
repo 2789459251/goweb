@@ -31,7 +31,6 @@ type pool struct {
 
 func NewPool(cap int) (*pool, error) {
 	p, err := NewTimePool(cap, DEFAULTEXPIRE)
-
 	return p, err
 }
 
@@ -48,7 +47,7 @@ func NewTimePool(cap int, expire time.Duration) (*pool, error) {
 		release: make(chan sig, 1),
 		expire:  expire * time.Second,
 	}
-	//go p.expiredWorker()
+	go p.expiredWorker()
 	return p, nil
 }
 
@@ -129,10 +128,9 @@ func (p *pool) Release() {
 	p.once.Do(func() {
 		p.lock.Lock()
 		for i, _ := range p.workers {
-			w := p.workers[i]
-			w.tasks = nil
-			w.pool = nil
-			w = nil
+			p.workers[i].tasks = nil
+			p.workers[i].pool = nil
+			p.workers[i] = nil
 		}
 		p.workers = nil
 		p.lock.Unlock()
