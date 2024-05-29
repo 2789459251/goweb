@@ -1,6 +1,8 @@
 package mypool
 
-import "time"
+import (
+	"time"
+)
 
 type Worker struct {
 	pool  *pool
@@ -9,12 +11,12 @@ type Worker struct {
 	lastTime time.Time
 }
 
-func (w *Worker) Run() {
+func (w *Worker) run() {
 	/* 开启协程，运行任务 */
-	go w.Running()
+	go w.running()
 }
 
-func (w *Worker) Running() {
+func (w *Worker) running() {
 	for f := range w.tasks {
 		f()
 		/*任务运行完成，worker空闲*/
