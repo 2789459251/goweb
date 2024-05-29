@@ -4,8 +4,11 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sync"
+	"time"
 	"web/zygo"
 	log_ "web/zygo/mylog"
+	"web/zygo/mypool"
 	err_ "web/zygo/zyerror"
 )
 
@@ -227,7 +230,44 @@ func main() {
 		err_ := login()
 		ctx.HandleWithError(http.StatusOK, user, err_)
 	})
+	p, _ := mypool.NewPool(5)
+	user.POST("/pool", func(ctx *zygo.Context) {
+		currentTime := time.Now().UnixMilli()
+		var wg sync.WaitGroup
+		wg.Add(5)
+		p.Submit(func() {
+			defer func() {
+				wg.Done()
+			}()
+			fmt.Println("1111111")
+			//panic("这是1111的panic")
+			time.Sleep(3 * time.Second)
 
+		})
+		p.Submit(func() {
+			fmt.Println("22222222")
+			time.Sleep(3 * time.Second)
+			wg.Done()
+		})
+		p.Submit(func() {
+			fmt.Println("33333333")
+			time.Sleep(3 * time.Second)
+			wg.Done()
+		})
+		p.Submit(func() {
+			fmt.Println("44444")
+			time.Sleep(3 * time.Second)
+			wg.Done()
+		})
+		p.Submit(func() {
+			fmt.Println("55555555")
+			time.Sleep(3 * time.Second)
+			wg.Done()
+		})
+		wg.Wait()
+		fmt.Printf("time: %v \n", time.Now().UnixMilli()-currentTime)
+		ctx.JSON(http.StatusOK, "success")
+	})
 	engine.Run(":8080", nil)
 }
 

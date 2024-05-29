@@ -29,12 +29,10 @@ type pool struct {
 	once    sync.Once     //释放协程的，保证只能使用一次
 }
 
-func NewPool(cap int) *pool {
+func NewPool(cap int) (*pool, error) {
 	p, err := NewTimePool(cap, DEFAULTEXPIRE)
-	if err != nil {
 
-	}
-	return p
+	return p, err
 }
 
 func NewTimePool(cap int, expire time.Duration) (*pool, error) {
@@ -50,7 +48,7 @@ func NewTimePool(cap int, expire time.Duration) (*pool, error) {
 		release: make(chan sig, 1),
 		expire:  expire * time.Second,
 	}
-	go p.expiredWorker()
+	//go p.expiredWorker()
 	return p, nil
 }
 
@@ -60,7 +58,7 @@ func (p *pool) expiredWorker() {
 }
 
 /*获取worker -> 提交任务*/
-func (p *pool) Submit(task func()) error {
+func (p *pool) Submit(task func()) (err error) {
 	if len(p.release) > 0 {
 		return ErrorPoolClosed
 	}
@@ -86,10 +84,10 @@ func (p *pool) GetWorker() *Worker {
 	//如果正在运行的worker数量要小于p的容量 直接创建
 	if p.running < p.cap {
 		p.lock.Lock()
-		w := &Worker{pool: p}
+		w := &Worker{pool: p, tasks: make(chan func(), 1)}
 		p.workers = append(p.workers, w)
 		p.lock.Unlock()
-		//w.Run()
+		w.run()
 		return w
 	}
 	//阻塞等待 worker释放
