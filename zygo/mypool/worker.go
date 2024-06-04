@@ -23,7 +23,6 @@ func (w *Worker) running() {
 		}
 		f()
 		/*任务运行完成，worker空闲*/
-
 		w.pool.PutWorker(w)
 		w.pool.decRunning()
 	}

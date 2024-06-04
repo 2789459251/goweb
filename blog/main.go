@@ -230,7 +230,7 @@ func main() {
 		err_ := login()
 		ctx.HandleWithError(http.StatusOK, user, err_)
 	})
-	p, _ := mypool.NewPool(3)
+	p, _ := mypool.NewPool(6)
 	user.POST("/pool", func(ctx *zygo.Context) {
 		currentTime := time.Now().UnixMilli()
 		var wg sync.WaitGroup
