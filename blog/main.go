@@ -9,6 +9,7 @@ import (
 	"web/zygo"
 	log_ "web/zygo/mylog"
 	"web/zygo/mypool"
+	"web/zygo/token"
 	err_ "web/zygo/zyerror"
 )
 
@@ -37,6 +38,10 @@ func main() {
 		}
 	})
 	user := engine.Group("user")
+	//fmt.Println(zygo.BasicAuth("zy", "123"))
+	//auth := &zygo.Accounts{Users: make(map[string]string)}
+	//auth.Users["zy"] = "123"
+	//user.Use(auth.BasicAuth)
 	//user.Use(zygo.Logging)
 	user.POST("/hello", func(ctx *zygo.Context) {
 		//ctx.Logger.WithFields(mylog.Fields{
@@ -60,7 +65,26 @@ func main() {
 	//		fmt.Println("post handler")
 	//	}
 	//})
+	user.GET("/login", func(ctx *zygo.Context) {
 
+		jwt := &token.JwtHandler{}
+		jwt.Key = "123456"
+		jwt.PrivateKey = "123"
+		jwt.SendCookie = true
+		jwt.TimeOut = 10 * time.Minute
+		jwt.Authenticator = func(ctx *zygo.Context) (map[string]any, error) {
+			data := make(map[string]any)
+			data["userId"] = 1
+			return data, nil
+		}
+		token, err := jwt.LoginHandler(ctx)
+		if err != nil {
+			fmt.Println(err.Error())
+			ctx.JSON(http.StatusOK, err.Error())
+			return
+		}
+		ctx.JSON(http.StatusOK, token)
+	})
 	user.GET("/get/:id", func(ctx *zygo.Context) {
 		fmt.Fprintln(ctx.W, "get id!")
 	})
@@ -240,7 +264,7 @@ func main() {
 				wg.Done()
 			}()
 			fmt.Println("1111111")
-			//panic("这是1111的panic")
+			panic("这是1111的panic")
 			time.Sleep(3 * time.Second)
 
 		})
@@ -268,7 +292,9 @@ func main() {
 		fmt.Printf("time: %v \n", time.Now().UnixMilli()-currentTime)
 		ctx.JSON(http.StatusOK, "success")
 	})
-	engine.Run(":8080", nil)
+	//engine.Run(":8080", nil)
+
+	engine.RunTLS(":8818", "key/server.pem", "key/server.key")
 }
 
 func a(int2 int, myError *err_.MyError) {

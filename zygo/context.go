@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"sync"
 	"web/zygo/binding"
 	"web/zygo/mylog"
 	"web/zygo/render"
@@ -29,6 +30,47 @@ type Context struct {
 	IsValidate            bool
 	StatusCode            int
 	Logger                *mylog.Logger
+	Keys                  map[string]any
+	mu                    sync.RWMutex
+	//安全性操作
+	sameSite http.SameSite
+}
+
+func (c *Context) SetSameSite(s http.SameSite) {
+	c.sameSite = s
+}
+
+// 保存cookie
+func (c *Context) SetCookie(name, value string, maxAge int, path, domain string, secure, httpOnly bool) {
+	if path == "" {
+		path = "/"
+	}
+	http.SetCookie(c.W, &http.Cookie{
+		Name:     name,
+		Value:    url.QueryEscape(value),
+		MaxAge:   maxAge,
+		Path:     path,
+		Domain:   domain,
+		SameSite: c.sameSite,
+		Secure:   secure,
+		HttpOnly: httpOnly,
+	})
+}
+
+func (c *Context) Set(key string, value any) {
+	c.mu.Lock()
+	if c.Keys == nil {
+		c.Keys = make(map[string]any)
+	}
+	c.Keys[key] = value
+	c.mu.Unlock()
+}
+
+func (c *Context) Get(key string) (v any, ok bool) {
+	c.mu.RLock()
+	v, ok = c.Keys[key]
+	c.mu.RUnlock()
+	return
 }
 
 func (c *Context) initQueryCache() {
