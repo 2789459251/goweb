@@ -19,7 +19,7 @@ type JwtHandler struct {
 	//私钥
 	PrivateKey string
 	//key
-	Key string
+	Key []byte
 	//save cookie
 	SendCookie bool
 	CookieName string
@@ -33,6 +33,8 @@ type JwtResponse struct {
 	Token        string
 	RefreshToken string
 }
+
+//登录  用户认证（用户名密码） -> 用户id 将id生成jwt，并且保存到cookie或者进行返回
 
 func (j *JwtHandler) LoginHandler(ctx *zygo.Context) (*JwtResponse, error) {
 	data, err := j.Authenticator(ctx)
@@ -100,7 +102,7 @@ func (j *JwtHandler) LoginHandler(ctx *zygo.Context) (*JwtResponse, error) {
 
 func (j *JwtHandler) usingPublicKeyAlgo() bool {
 	switch j.Alg {
-	case "HS256", "HS384", "HS512":
+	case "RS256", "RS512", "RS384":
 		return true
 	}
 	return false

@@ -68,8 +68,7 @@ func main() {
 	user.GET("/login", func(ctx *zygo.Context) {
 
 		jwt := &token.JwtHandler{}
-		jwt.Key = "123456"
-		jwt.PrivateKey = "123"
+		jwt.Key = []byte("123456")
 		jwt.SendCookie = true
 		jwt.TimeOut = 10 * time.Minute
 		jwt.Authenticator = func(ctx *zygo.Context) (map[string]any, error) {
