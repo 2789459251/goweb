@@ -71,12 +71,34 @@ func main() {
 		jwt.Key = []byte("123456")
 		jwt.SendCookie = true
 		jwt.TimeOut = 10 * time.Minute
+		jwt.RefreshTimeOut = 15 * time.Minute
 		jwt.Authenticator = func(ctx *zygo.Context) (map[string]any, error) {
 			data := make(map[string]any)
 			data["userId"] = 1
 			return data, nil
 		}
 		token, err := jwt.LoginHandler(ctx)
+		if err != nil {
+			fmt.Println(err.Error())
+			ctx.JSON(http.StatusOK, err.Error())
+			return
+		}
+		ctx.JSON(http.StatusOK, token)
+	})
+	user.GET("/refresh", func(ctx *zygo.Context) {
+
+		jwt := &token.JwtHandler{}
+		jwt.Key = []byte("123456")
+		jwt.SendCookie = true
+		jwt.TimeOut = 10 * time.Minute
+		jwt.RefreshKey = "blog_refresh_key"
+		ctx.Set(jwt.RefreshKey, "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3MTc5MTM2OTksImlhdCI6MTcxNzkxMjc5OSwidXNlcklkIjoxfQ.CkX5m0EDcOgEBbBOpIIXTLRMyr8NM6MtJklOceSankU")
+		jwt.Authenticator = func(ctx *zygo.Context) (map[string]any, error) {
+			data := make(map[string]any)
+			data["userId"] = 1
+			return data, nil
+		}
+		token, err := jwt.RefreshHandler(ctx)
 		if err != nil {
 			fmt.Println(err.Error())
 			ctx.JSON(http.StatusOK, err.Error())

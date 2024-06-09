@@ -1,10 +1,13 @@
 package token
 
 import (
+	"errors"
 	"github.com/golang-jwt/jwt/v4"
 	"time"
 	"web/zygo"
 )
+
+const JWTTOKEN = "my_token"
 
 type JwtHandler struct {
 	//算法
@@ -17,9 +20,10 @@ type JwtHandler struct {
 	//时间函数 从**此时**开始计算过期
 	TimeFuc func() time.Time
 	//私钥
-	PrivateKey string
+	PrivateKey []byte
 	//key
-	Key []byte
+	Key        []byte
+	RefreshKey string
 	//save cookie
 	SendCookie bool
 	CookieName string
@@ -89,7 +93,7 @@ func (j *JwtHandler) LoginHandler(ctx *zygo.Context) (*JwtResponse, error) {
 	//发送到存储cookie
 	if j.SendCookie {
 		if j.CookieName == "" {
-			j.CookieName = "my_token"
+			j.CookieName = JWTTOKEN
 		}
 		if j.CookieMaxAge == 0 {
 			j.CookieMaxAge = int(expire.Unix() - j.TimeFuc().Unix())
@@ -111,7 +115,7 @@ func (j *JwtHandler) usingPublicKeyAlgo() bool {
 func (j *JwtHandler) refreshToken(token *jwt.Token) (string, error) {
 	//B部分
 	claims := token.Claims.(jwt.MapClaims)
-	claims["exp"] = j.TimeFuc().Add(j.TimeOut).Unix()
+	claims["exp"] = j.TimeFuc().Add(j.RefreshTimeOut).Unix()
 	var tokenString string
 	var tokenErr error
 	if j.usingPublicKeyAlgo() {
@@ -124,4 +128,86 @@ func (j *JwtHandler) refreshToken(token *jwt.Token) (string, error) {
 		return "", tokenErr
 	}
 	return tokenString, nil
+}
+
+// 退出登陆
+func (j *JwtHandler) LogoutHandler(ctx *zygo.Context) error {
+	if j.SendCookie {
+		if j.CookieName == "" {
+			j.CookieName = JWTTOKEN
+		}
+		ctx.SetCookie(j.CookieName, "", -1, "/", j.CookieDomain, j.SecureCookie, j.CookieHTTPOnly)
+		return nil
+	}
+	return nil
+}
+
+// 刷新token
+func (j *JwtHandler) RefreshHandler(ctx *zygo.Context) (*JwtResponse, error) {
+	rToken, ok := ctx.Get(j.RefreshKey)
+	if !ok {
+		return nil, errors.New("refresh token is null")
+	}
+	if j.Alg == "" {
+		j.Alg = "HS256"
+	}
+	//解析token
+
+	t, err := jwt.Parse(rToken.(string), func(token *jwt.Token) (interface{}, error) {
+		if j.usingPublicKeyAlgo() {
+			return j.PrivateKey, nil
+		} else {
+			return j.Key, nil
+		}
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	//B部分
+	claims := t.Claims.(jwt.MapClaims)
+	//未过期的情况下 重新生成token和refreshToken
+	if j.TimeFuc == nil {
+		j.TimeFuc = func() time.Time {
+			return time.Now()
+		}
+	}
+	expire := j.TimeFuc().Add(j.TimeOut)
+	claims["exp"] = expire.Unix()
+	claims["iat"] = j.TimeFuc().Unix()
+
+	//C部分
+	var tokenString string
+	var tokenErr error
+	if j.usingPublicKeyAlgo() {
+		//需要私钥
+		tokenString, tokenErr = t.SignedString(j.PrivateKey)
+	} else {
+		tokenString, tokenErr = t.SignedString(j.Key)
+	}
+	if tokenErr != nil {
+		return nil, tokenErr
+	}
+
+	jr := &JwtResponse{
+		Token: tokenString,
+	}
+	//refresh token
+	refreshToken, err := j.refreshToken(t)
+	if err != nil {
+		return nil, err
+	}
+	jr.RefreshToken = refreshToken
+	//发送到存储cookie
+	if j.SendCookie {
+		if j.CookieName == "" {
+			j.CookieName = JWTTOKEN
+		}
+		if j.CookieMaxAge == 0 {
+			j.CookieMaxAge = int(expire.Unix() - j.TimeFuc().Unix())
+		}
+		ctx.SetCookie(j.CookieName, tokenString, j.CookieMaxAge, "/", j.CookieDomain, j.SecureCookie, j.CookieHTTPOnly)
+	}
+
+	return jr, nil
 }
