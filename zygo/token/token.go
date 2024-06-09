@@ -3,6 +3,7 @@ package token
 import (
 	"errors"
 	"github.com/golang-jwt/jwt/v4"
+	"net/http"
 	"time"
 	"web/zygo"
 )
@@ -36,7 +37,7 @@ type JwtHandler struct {
 	//获取认证字段
 	Header string
 	//认证错误处理
-	AuthHandler func(ctx *zygo.Context)
+	AuthHandler func(ctx *zygo.Context, err error)
 }
 type JwtResponse struct {
 	Token        string
@@ -218,8 +219,53 @@ func (j *JwtHandler) RefreshHandler(ctx *zygo.Context) (*JwtResponse, error) {
 }
 
 // jwt登陆拦截器
-func (j *JwtHandler) AuthIntserception(next zygo.HandlerFunc) zygo.HandlerFunc {
+func (j *JwtHandler) AuthIntserceptor(next zygo.HandlerFunc) zygo.HandlerFunc {
 	return func(ctx *zygo.Context) {
-
+		if j.Header == "" {
+			j.Header = "Authorization"
+		}
+		token := ctx.R.Header.Get(j.Header)
+		if token == "" {
+			if j.SendCookie {
+				cookie, err := ctx.R.Cookie(j.CookieName)
+				if err != nil {
+					if j.AuthHandler == nil {
+						ctx.W.WriteHeader(http.StatusUnauthorized)
+						return
+					} else {
+						j.AuthHandler(ctx, err)
+						return
+					}
+				}
+				token = cookie.String()
+			}
+		}
+		if token == "" {
+			if j.AuthHandler == nil {
+				ctx.W.WriteHeader(http.StatusUnauthorized)
+				return
+			} else {
+				j.AuthHandler(ctx, errors.New("token is null"))
+				return
+			}
+		}
+		t, err := jwt.Parse(token, func(token *jwt.Token) (interface{}, error) {
+			if j.usingPublicKeyAlgo() {
+				return j.PrivateKey, nil
+			} else {
+				return j.Key, nil
+			}
+		})
+		if err != nil {
+			if j.AuthHandler == nil {
+				ctx.W.WriteHeader(http.StatusUnauthorized)
+				return
+			} else {
+				j.AuthHandler(ctx, err)
+				return
+			}
+		}
+		ctx.Set("claims", t.Claims.(jwt.MapClaims))
+		next(ctx)
 	}
 }

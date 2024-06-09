@@ -37,12 +37,15 @@ func main() {
 			return http.StatusInternalServerError, "500 error"
 		}
 	})
+
 	user := engine.Group("user")
 	//fmt.Println(zygo.BasicAuth("zy", "123"))
 	//auth := &zygo.Accounts{Users: make(map[string]string)}
 	//auth.Users["zy"] = "123"
 	//user.Use(auth.BasicAuth)
 	//user.Use(zygo.Logging)
+	th := &token.JwtHandler{Key: []byte("123456")}
+	user.Use(th.AuthIntserceptor)
 	user.POST("/hello", func(ctx *zygo.Context) {
 		//ctx.Logger.WithFields(mylog.Fields{
 		//	"name": "码神之路",
@@ -315,6 +318,27 @@ func main() {
 	})
 	//engine.Run(":8080", nil)
 
+	aa := engine.Group("a")
+	aa.GET("/login", func(ctx *zygo.Context) {
+
+		jwt := &token.JwtHandler{}
+		jwt.Key = []byte("123456")
+		jwt.SendCookie = true
+		jwt.TimeOut = 10 * time.Minute
+		jwt.RefreshTimeOut = 15 * time.Minute
+		jwt.Authenticator = func(ctx *zygo.Context) (map[string]any, error) {
+			data := make(map[string]any)
+			data["userId"] = 1
+			return data, nil
+		}
+		token, err := jwt.LoginHandler(ctx)
+		if err != nil {
+			fmt.Println(err.Error())
+			ctx.JSON(http.StatusOK, err.Error())
+			return
+		}
+		ctx.JSON(http.StatusOK, token)
+	})
 	engine.RunTLS(":8818", "key/server.pem", "key/server.key")
 }
 
