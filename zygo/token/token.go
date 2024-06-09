@@ -32,6 +32,11 @@ type JwtHandler struct {
 	CookieDomain   string
 	SecureCookie   bool
 	CookieHTTPOnly bool
+
+	//获取认证字段
+	Header string
+	//认证错误处理
+	AuthHandler func(ctx *zygo.Context)
 }
 type JwtResponse struct {
 	Token        string
@@ -210,4 +215,11 @@ func (j *JwtHandler) RefreshHandler(ctx *zygo.Context) (*JwtResponse, error) {
 	}
 
 	return jr, nil
+}
+
+// jwt登陆拦截器
+func (j *JwtHandler) AuthIntserception(next zygo.HandlerFunc) zygo.HandlerFunc {
+	return func(ctx *zygo.Context) {
+
+	}
 }
