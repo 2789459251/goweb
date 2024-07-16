@@ -3,12 +3,9 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"fmt"
+	"goodscenter/api"
 	"goodscenter/model"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 	"net/http"
-	"ordercenter/api"
 	service2 "ordercenter/service"
 	"web/zygo"
 	"web/zygo/rpc"
@@ -46,18 +43,25 @@ func main() {
 
 	group.GET("/findGRPC", func(ctx *zygo.Context) {
 		var serviceHost = "127.0.0.1:9111"
-		conn, err := grpc.Dial(serviceHost, grpc.WithTransportCredentials(insecure.NewCredentials()))
-		if err != nil {
-			fmt.Println(err)
-		}
-		defer conn.Close()
+		//conn, err := grpc.Dial(serviceHost, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		//if err != nil {
+		//	fmt.Println(err)
+		//}
+		//defer conn.Close()
+		//
+		//client := api.NewGoodsApiClient(conn)
+		//rsp, err := client.Find(context.TODO(), &api.GoodsRequest{})
+		//
+		//if err != nil {
+		//	fmt.Println(err)
+		//}
+		Config := rpc.DefaultGrpcClientConfig()
+		Config.Address = serviceHost
+		client, _ := rpc.NewGrpcClient(Config)
+		defer client.Conn.Close()
 
-		client := api.NewGoodsApiClient(conn)
-		rsp, err := client.Find(context.TODO(), &api.GoodsRequest{})
-
-		if err != nil {
-			fmt.Println(err)
-		}
+		goodsApiClient := api.NewGoodsApiClient(client.Conn)
+		rsp, _ := goodsApiClient.Find(context.Background(), &api.GoodsRequest{})
 		ctx.JSON(http.StatusOK, rsp)
 	})
 	r.Run(":9003", nil)

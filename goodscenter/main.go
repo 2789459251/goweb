@@ -1,13 +1,11 @@
 package main
 
 import (
-	"goodscenter/api"
 	"goodscenter/model"
-	"google.golang.org/grpc"
-	"log"
-	"net"
+	"goodscenter/service"
 	"net/http"
 	"web/zygo"
+	"web/zygo/rpc"
 )
 
 func main() {
@@ -36,10 +34,27 @@ func main() {
 		})
 	})
 
-	listen, _ := net.Listen("tcp", ":9111")
-	server := grpc.NewServer()
-	api.RegisterGoodsApiServer(server, &api.GoodsApiService{})
-	err := server.Serve(listen)
-	log.Println(err)
+	//1.grpc
+	//listen, _ := net.Listen("tcp", ":9111")
+	//server := grpc.NewServer()
+	//api.RegisterGoodsApiServer(server, &api.GoodsApiService{})
+	//err := server.Serve(listen)
+	//log.Println(err)
+
+	//2.框架封装grpc
+	//server, err := rpc.NewGrpcServer(":9111")
+	//if err != nil {
+	//	return
+	//}
+	//server.Register(func(grpServer *grpc.Server) {
+	//	api.RegisterGoodsApiServer(grpServer, &api.GoodsApiService{})
+	//})
+	//server.Run()
+
+	//3.tcp手写
+
+	tcpServer := rpc.NewTcpServer("localhost", 9222)
+	tcpServer.Register("goods", service.GoodsRpcService{})
+	tcpServer.Run()
 	r.Run(":9002", nil)
 }
