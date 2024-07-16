@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+import "google/protobuf/struct.proto";
+
+option go_package="/rpc";
+
+package rpc;
+
+message Request {
+  int64 RequestId = 1;
+  string ServiceName = 2;
+  string MethodName = 3;
+  repeated google.protobuf.Value Args = 4;
+}
+
+message Response {
+  int64 RequestId = 1;
+  int32 Code = 2;
+  string Msg = 3;
+  int32 CompressType = 4;
+  int32 SerializeType = 5;
+  google.protobuf.Value Data = 6;
+}
