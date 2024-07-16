@@ -44,8 +44,9 @@ func main() {
 	//auth.Users["zy"] = "123"
 	//user.Use(auth.BasicAuth)
 	//user.Use(zygo.Logging)
-	th := &token.JwtHandler{Key: []byte("123456")}
-	user.Use(th.AuthIntserceptor)
+	//jwt中间件
+	//th := &token.JwtHandler{Key: []byte("123456")}
+	//user.Use(th.AuthIntserceptor)
 	user.POST("/hello", func(ctx *zygo.Context) {
 		//ctx.Logger.WithFields(mylog.Fields{
 		//	"name": "码神之路",
@@ -135,7 +136,9 @@ func main() {
 			fmt.Println(err)
 		}
 	})
-	engine.LoadTemplate("tem/*.html")
+	//engine.LoadTemplate("tem/*.html")
+	//使用配置文件加载模板
+	engine.LoadTemplateConf()
 	user.GET("/template", func(ctx *zygo.Context) {
 		ctx.Template("sc.html", "")
 	})

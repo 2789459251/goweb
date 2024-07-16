@@ -6,6 +6,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"web/zygo/config"
 )
 
 type sig struct{}
@@ -34,6 +35,13 @@ type Pool struct {
 
 }
 
+func NewPoolConf() (*Pool, error) {
+	cap, ok := config.Conf.Pool["cap"]
+	if !ok {
+		return nil, errors.New("cap config not exist")
+	}
+	return NewTimePool(int(cap.(int64)), DEFAULTEXPIRE)
+}
 func NewPool(cap int) (*Pool, error) {
 	p, err := NewTimePool(cap, DEFAULTEXPIRE)
 	return p, err

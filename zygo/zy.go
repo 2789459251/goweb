@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"sync"
+	"web/zygo/config"
 	"web/zygo/mylog"
 	"web/zygo/render"
 )
@@ -134,7 +135,10 @@ func Default() *Engine {
 	engine.Use(Logging, Recovery)
 	engine.router.engine = engine
 	engine.Logger = mylog.Default()
-
+	logPath, ok := config.Conf.Log["path"]
+	if ok {
+		engine.Logger.SetLogPath(logPath.(string))
+	}
 	return engine
 }
 
@@ -161,6 +165,16 @@ func (e *Engine) allocateContext() any {
 }
 func (e *Engine) SetFuncMap(funcMap template.FuncMap) {
 	e.funcMap = funcMap
+}
+
+func (e *Engine) LoadTemplateConf() {
+	//这里没有name阿
+	pattern, ok := config.Conf.Template["pattern"]
+	if ok {
+		t := template.Must(template.New("").Funcs(e.funcMap).ParseGlob(pattern.(string)))
+		e.SetHtmlTemplate(t)
+	}
+
 }
 
 func (e *Engine) LoadTemplate(pattern string) {

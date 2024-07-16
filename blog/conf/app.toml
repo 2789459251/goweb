@@ -1,0 +1,13 @@
+[log]
+path = "./log"
+[pool]
+cap = 10
+[mysql]
+username="root"
+password = "123"
+table_prefix = "zygo_"
+[redis]
+host = "127.0.0.1"
+port = 6379
+[template]
+pattern = "tem/*.htm"
