@@ -1,0 +1,23 @@
+syntax = "proto3";
+option go_package = "/api";
+
+package api;
+
+service GoodsApi {
+  rpc Find(GoodsRequest) returns (GoodsResponse);
+}
+
+message GoodsRequest {
+
+}
+
+message GoodsResponse {
+  int64 Code = 1;
+  string Msg = 2;
+  Goods Data = 3;
+}
+
+message Goods {
+  int64 Id = 1;
+  string Name = 2;
+}
