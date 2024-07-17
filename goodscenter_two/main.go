@@ -83,7 +83,7 @@ func main() {
 	gob.Register(&model.Goods{})
 	tcpServer.Register("goods", &service.GoodsRpcService{})
 	go tcpServer.Run()
-	go r.Run(":9005", nil)
+	go r.Run(":9005")
 	quit := make(chan os.Signal)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGQUIT)
 	<-quit

@@ -114,5 +114,5 @@ func main() {
 		}
 		ctx.JSON(http.StatusOK, result)
 	})
-	r.Run(":9003", nil)
+	r.Run(":9003")
 }
