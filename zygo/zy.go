@@ -11,6 +11,7 @@ import (
 	"web/zygo/config"
 	"web/zygo/gateway"
 	"web/zygo/mylog"
+	"web/zygo/register"
 	"web/zygo/render"
 )
 
@@ -137,6 +138,9 @@ type Engine struct {
 	gatewayTreeNode  *gateway.TreeNode
 	gatewayConfigMap map[string]gateway.GWConfig
 	gatewayConfigs   []gateway.GWConfig
+	RegisterType     string
+	RegisterOption   register.Option
+	RegisterCli      register.MyRegister
 }
 
 func (e *Engine) SetGateConfigs(configs []gateway.GWConfig) {
@@ -228,7 +232,17 @@ func (e *Engine) httpRequestHandle(ctx *Context, w http.ResponseWriter, r *http.
 			return
 		}
 		gwConfig := e.gatewayConfigMap[node.GwName]
-		target, err := url.Parse(fmt.Sprintf("http://%s:%d%s", gwConfig.Host, gwConfig.Port, path))
+		gwConfig.Header(ctx.R)
+
+		addr, err2 := e.RegisterCli.GetValue(gwConfig.ServiceName)
+
+		if err2 != nil {
+			ctx.W.WriteHeader(http.StatusNotFound)
+			fmt.Fprintln(ctx.W, ctx.R.RequestURI+" register cli get value err:"+err2.Error())
+			return
+		}
+		target, err := url.Parse(fmt.Sprintf("http://%s%s", addr, path))
+
 		if err != nil {
 			ctx.W.WriteHeader(http.StatusInternalServerError)
 			fmt.Fprintln(ctx.W, err.Error())
@@ -243,6 +257,7 @@ func (e *Engine) httpRequestHandle(ctx *Context, w http.ResponseWriter, r *http.
 				req.Header.Set("User-Agent", "")
 			}
 		}
+		//todo 代理的响应处理和错误修改
 		response := func(response *http.Response) error {
 			log.Println("响应修改")
 			return nil
@@ -287,6 +302,22 @@ func (e *Engine) Run(addr string) {
 			}
 		}
 	*/
+	if e.RegisterType == "nacos" {
+		r := &register.NacosRegister{}
+		err := r.CreateCli(e.RegisterOption)
+		if err != nil {
+			panic(err)
+		}
+		e.RegisterCli = r
+	}
+	if e.RegisterType == "etcd" {
+		r := &register.EtcdRegister{}
+		err := r.CreateCli(e.RegisterOption)
+		if err != nil {
+			panic(err)
+		}
+		e.RegisterCli = r
+	}
 	http.Handle("/", e)
 	err := http.ListenAndServe(addr, nil)
 	if err != nil {

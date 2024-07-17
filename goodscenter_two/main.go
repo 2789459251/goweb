@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/gob"
+	"fmt"
 	"github.com/nacos-group/nacos-sdk-go/common/constant"
 	"goodscenter_two/model"
 	"goodscenter_two/service"
@@ -18,9 +19,11 @@ func main() {
 	r := zygo.Default()
 	group := r.Group("goods")
 	group.GET("/find", func(ctx *zygo.Context) {
+		v := ctx.GetHeader("zy")
+		fmt.Println("get zygo" + v)
 		good := &model.Goods{
 			ID:   1,
-			Name: "跳跳糖",
+			Name: "不吃跳跳糖",
 		}
 		ctx.JSON(http.StatusOK, &model.Result{
 			Code: 200,
@@ -79,6 +82,25 @@ func main() {
 	//	Host:        "127.0.0.1",
 	//	Port:        9223,
 	//}
+
+	cli := register.NacosRegister{}
+	err := cli.CreateCli(register.Option{
+		DialTimeout: 5000,
+		NacosServerConfig: []constant.ServerConfig{
+			{
+				IpAddr:      "127.0.0.1",
+				ContextPath: "/nacos",
+				Port:        8848,
+				Scheme:      "http",
+			},
+		},
+		ServiceName: "goodsCenter",
+	})
+	if err != nil {
+		return
+	}
+	cli.RegisterService("goodsCenter", "127.0.0.1", 9005)
+
 	gob.Register(&model.Result{})
 	gob.Register(&model.Goods{})
 	tcpServer.Register("goods", &service.GoodsRpcService{})
@@ -88,7 +110,7 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGQUIT)
 	<-quit
 	tcpServer.Close()
-	//
+
 	//tcpServer := rpc.NewTcpServer("localhost", 9222)
 	//tcpServer.Register("goods", &service.GoodsRpcService{})
 	//tcpServer.Run()

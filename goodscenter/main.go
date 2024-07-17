@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/gob"
+	"fmt"
 	"github.com/nacos-group/nacos-sdk-go/common/constant"
 	"goodscenter/model"
 	"goodscenter/service"
@@ -18,6 +19,25 @@ func main() {
 	r := zygo.Default()
 	group := r.Group("goods")
 	group.GET("/find", func(ctx *zygo.Context) {
+		v := ctx.GetHeader("zy")
+		fmt.Println("get zygo" + v)
+
+		cli := register.NacosRegister{}
+		err := cli.CreateCli(register.Option{
+			DialTimeout: 5000,
+			NacosServerConfig: []constant.ServerConfig{
+				{
+					IpAddr:      "127.0.0.1",
+					ContextPath: "/nacos",
+					Port:        8848,
+					Scheme:      "http",
+				},
+			},
+		})
+		if err != nil {
+			return
+		}
+		cli.RegisterService("goodsCenter", "127.0.0.1", 9002)
 		good := &model.Goods{
 			ID:   1,
 			Name: "跳跳糖",
@@ -83,6 +103,23 @@ func main() {
 	gob.Register(&model.Result{})
 	gob.Register(&model.Goods{})
 	tcpServer.Register("goods", &service.GoodsRpcService{})
+
+	cli := register.NacosRegister{}
+	err := cli.CreateCli(register.Option{
+		DialTimeout: 5000,
+		NacosServerConfig: []constant.ServerConfig{
+			{
+				IpAddr:      "127.0.0.1",
+				ContextPath: "/nacos",
+				Port:        8848,
+				Scheme:      "http",
+			},
+		},
+	})
+	if err != nil {
+		return
+	}
+	cli.RegisterService("goodsCenter", "127.0.0.1", 9002)
 	go tcpServer.Run()
 	go r.Run(":9002")
 	quit := make(chan os.Signal)
@@ -94,4 +131,5 @@ func main() {
 	//tcpServer.Register("goods", &service.GoodsRpcService{})
 	//tcpServer.Run()
 	//r.Run(":9002", nil)
+
 }

@@ -72,7 +72,9 @@ func (c *Context) Get(key string) (v any, ok bool) {
 	c.mu.RUnlock()
 	return
 }
-
+func (c *Context) GetHeader(key string) string {
+	return c.R.Header.Get(key)
+}
 func (c *Context) initQueryCache() {
 	//if c.queryCache == nil {
 	if c.R != nil {
