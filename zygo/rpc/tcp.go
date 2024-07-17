@@ -140,6 +140,7 @@ type MyTcpServer struct {
 	serviceMap     map[string]interface{}
 	RegisterType   string
 	RegisterOption register.Option
+	RegisterCli    register.MyRegister
 }
 
 type MsTcpConn struct {
@@ -244,6 +245,17 @@ func NewTcpServer(host string, port int) *MyTcpServer {
 		Network: "tcp",
 	}
 }
+func (s *MyTcpServer) SetRegister(registerType string, option register.Option) {
+	s.RegisterType = registerType
+	s.RegisterOption = option
+	if s.RegisterType == "nacos" {
+		s.RegisterCli = &register.NacosRegister{}
+	}
+	if s.RegisterType == "etcd" {
+		s.RegisterCli = &register.EtcdRegister{}
+	}
+
+}
 func (s *MyTcpServer) Register(name string, service interface{}) {
 	if s.serviceMap == nil {
 		s.serviceMap = make(map[string]interface{})
@@ -253,31 +265,43 @@ func (s *MyTcpServer) Register(name string, service interface{}) {
 		panic(errors.New("service not pointer"))
 	}
 	s.serviceMap[name] = service
-
-	//使用nacos进行注册
-	if s.RegisterType == "nacos" {
-		cli, err := register.CreateNacosClient()
-		if err != nil {
-			panic(err)
+	/*	抽象出去
+		//使用nacos进行注册
+		if s.RegisterType == "nacos" {
+			cli, err := register.CreateNacosClient()
+			if err != nil {
+				panic(err)
+			}
+			err = register.RegisterService(cli, name, s.Host, uint64(s.Port))
+			if err != nil {
+				panic(err)
+			}
 		}
-		err = register.RegisterService(cli, name, s.Host, uint64(s.Port))
-		if err != nil {
-			panic(err)
-		}
+		if s.RegisterType == "etcd" {
+			cli, err := register.CreateEtcdCli(s.RegisterOption)
+			if err != nil {
+				panic(err)
+			}
+			err = register.RegisterEtcdService(cli, name, s.Host, s.Port)
+			if err != nil {
+				panic(err)
+			}
+			cli.Close()
+		}*/
+	err := s.RegisterCli.CreateCli(s.RegisterOption)
+	if err != nil {
+		panic(err)
 	}
-	if s.RegisterType == "etcd" {
-		cli, err := register.CreateEtcdCli(s.RegisterOption)
-		if err != nil {
-			panic(err)
-		}
-		err = register.RegisterEtcdService(cli, name, s.Host, s.Port)
-		if err != nil {
-			panic(err)
-		}
-		cli.Close()
+	err = s.RegisterCli.RegisterService(name, s.Host, s.Port)
+	if err != nil {
+		panic(err)
 	}
-
+	err = s.RegisterCli.Close()
+	if err != nil {
+		panic(err)
+	}
 }
+
 func (s *MyTcpServer) Run() {
 	addr := fmt.Sprintf("%s:%d", s.Host, s.Port)
 	listen, err := net.Listen(s.Network, addr)
@@ -622,6 +646,7 @@ type MyTcpClient struct {
 	conn        net.Conn
 	option      TcpClientOption
 	ServiceName string
+	RegisterCli register.MyRegister
 }
 
 type TcpClientOption struct {
@@ -651,33 +676,46 @@ func NewTcpClient(option TcpClientOption) *MyTcpClient {
 func (c *MyTcpClient) Connect() error {
 	//addr := fmt.Sprintf("%s:%d", c.option.Host, c.option.Port)
 	var addr string
-	//更改为从注册中心获取
-	if c.option.RegisterType == "nacos" {
-		cli, err := register.CreateNacosClient()
-		if err != nil {
-			panic(err)
-		}
-		//服务名
-		host, port, err := register.GetService(cli, c.ServiceName)
-		if err != nil {
-			panic(err)
-		}
+	/*	抽象出去
+		//更改为从注册中心获取
+			if c.option.RegisterType == "nacos" {
+				cli, err := register.CreateNacosClient()
+				if err != nil {
+					panic(err)
+				}
+				//服务名
+				host, port, err := register.GetService(cli, c.ServiceName)
+				if err != nil {
+					panic(err)
+				}
 
-		addr = fmt.Sprintf("%s:%d", host, int(port))
-	}
+				addr = fmt.Sprintf("%s:%d", host, int(port))
+			}
 
-	if c.option.RegisterType == "etcd" {
-		cli, err := register.CreateEtcdCli(c.option.RegisterOption)
-		if err != nil {
-			panic(err)
-		}
-		addr, err = register.GetEtcdValue(cli, c.ServiceName)
-		if err != nil {
-			panic(err)
-		}
-		cli.Close()
+			if c.option.RegisterType == "etcd" {
+				cli, err := register.CreateEtcdCli(c.option.RegisterOption)
+				if err != nil {
+					panic(err)
+				}
+				addr, err = register.GetEtcdValue(cli, c.ServiceName)
+				if err != nil {
+					panic(err)
+				}
+				cli.Close()
+			}
+			fmt.Println(addr)*/
+	err := c.RegisterCli.CreateCli(c.option.RegisterOption)
+	if err != nil {
+		panic(err)
 	}
-	fmt.Println(addr)
+	addr, err = c.RegisterCli.GetValue(c.ServiceName)
+	if err != nil {
+		panic(err)
+	}
+	err = c.RegisterCli.Close()
+	if err != nil {
+		panic(err)
+	}
 	conn, err := net.DialTimeout("tcp", addr, c.option.ConnectionTimeout)
 	if err != nil {
 		return err
@@ -923,8 +961,14 @@ func NewMyTcpClientProxy(option TcpClientOption) *MyTcpClientProxy {
 func (p *MyTcpClientProxy) Call(ctx context.Context, serviceName string, methodName string, args []any) (any, error) {
 	client := NewTcpClient(p.option)
 	client.ServiceName = serviceName
-	p.client = client
 
+	if p.option.RegisterType == "etcd" {
+		client.RegisterCli = &register.EtcdRegister{}
+	}
+	if p.option.RegisterType == "nacos" {
+		client.RegisterCli = &register.NacosRegister{}
+	}
+	p.client = client
 	err := client.Connect()
 	if err != nil {
 		return nil, err

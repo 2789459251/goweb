@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/gob"
 	"encoding/json"
+	"github.com/nacos-group/nacos-sdk-go/common/constant"
 	"goodscenter/model"
 	"net/http"
 	service2 "ordercenter/service"
@@ -74,11 +75,27 @@ func main() {
 
 		option := rpc.DefaultOption
 		option.SerializeType = rpc.ProtoBuff
-		option.RegisterType = "etcd"
+		option.RegisterType = "nacos"
 		option.RegisterOption = register.Option{
-			Endpoints:   []string{"127.0.0.1:2379"},
 			DialTimeout: 5 * time.Second,
+			NacosServerConfig: []constant.ServerConfig{
+				{
+					IpAddr:      "127.0.0.1",
+					ContextPath: "/nacos",
+					Port:        8848,
+					Scheme:      "http",
+				},
+			},
+			NacosClientConfig: constant.NewClientConfig(
+				constant.WithNamespaceId(""), //当namespace是public时，此处填空字符串。
+				constant.WithTimeoutMs(5000),
+				constant.WithNotLoadCacheAtStart(true),
+				constant.WithLogDir("/tmp/nacos/log"),
+				constant.WithCacheDir("/tmp/nacos/cache"),
+				constant.WithLogLevel("debug"),
+			),
 		}
+
 		proxy := rpc.NewMyTcpClientProxy(option)
 		//params := make([]any, 1)
 		//params[0] = int64(1)
@@ -86,6 +103,7 @@ func main() {
 		//->这样的 body, err := cli.Do("goods", "Find").(*service2.GoodsService).Find(params)
 		//result, err := proxy.Call(context.Background(), "goods", "Find", params)
 		//log.Panicln(err)
+
 		gob.Register(&model.Result{})
 		gob.Register(&model.Goods{})
 		args := make([]any, 1)

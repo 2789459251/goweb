@@ -2,13 +2,13 @@ package main
 
 import (
 	"encoding/gob"
+	"github.com/nacos-group/nacos-sdk-go/common/constant"
 	"goodscenter/model"
 	"goodscenter/service"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 	"web/zygo"
 	"web/zygo/register"
 	"web/zygo/rpc"
@@ -59,14 +59,27 @@ func main() {
 
 	//3.tcp手写
 
-	tcpServer := rpc.NewTcpServer("127.0.0.1", 9222)
-	tcpServer.RegisterType = "etcd"
-	tcpServer.RegisterOption = register.Option{
-		Endpoints:   []string{"127.0.0.1:2379"},
-		DialTimeout: 5 * time.Second,
-		Host:        "127.0.0.1",
-		Port:        9222,
-	}
+	//tcpServer := rpc.NewTcpServer("127.0.0.1", 9222)
+	//tcpServer.RegisterType = "etcd"
+	//tcpServer.RegisterOption = register.Option{
+	//	Endpoints:   []string{"127.0.0.1:2379"},
+	//	DialTimeout: 5 * time.Second,
+	//	Host:        "127.0.0.1",
+	//	Port:        9222,
+	//}
+	//注册中心抽象出来的应用
+	tcpServer := rpc.NewTcpServer("localhost", 9112)
+	tcpServer.SetRegister("nacos", register.Option{
+		DialTimeout: 5000,
+		NacosServerConfig: []constant.ServerConfig{
+			{
+				IpAddr:      "127.0.0.1",
+				ContextPath: "/nacos",
+				Port:        8848,
+				Scheme:      "http",
+			},
+		},
+	})
 	gob.Register(&model.Result{})
 	gob.Register(&model.Goods{})
 	tcpServer.Register("goods", &service.GoodsRpcService{})
