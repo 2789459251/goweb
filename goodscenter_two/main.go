@@ -2,8 +2,8 @@ package main
 
 import (
 	"encoding/gob"
-	"goodscenter/model"
-	"goodscenter/service"
+	"goodscenter_two/model"
+	"goodscenter_two/service"
 	"net/http"
 	"os"
 	"os/signal"
@@ -59,19 +59,19 @@ func main() {
 
 	//3.tcp手写
 
-	tcpServer := rpc.NewTcpServer("127.0.0.1", 9222)
+	tcpServer := rpc.NewTcpServer("127.0.0.1", 9223)
 	tcpServer.RegisterType = "etcd"
 	tcpServer.RegisterOption = register.Option{
 		Endpoints:   []string{"127.0.0.1:2379"},
 		DialTimeout: 5 * time.Second,
 		Host:        "127.0.0.1",
-		Port:        9222,
+		Port:        9223,
 	}
 	gob.Register(&model.Result{})
 	gob.Register(&model.Goods{})
 	tcpServer.Register("goods", &service.GoodsRpcService{})
 	go tcpServer.Run()
-	go r.Run(":9002", nil)
+	go r.Run(":9005", nil)
 	quit := make(chan os.Signal)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGQUIT)
 	<-quit

@@ -5,4 +5,5 @@ use (
 	./zygo
 	goodscenter
 	ordercenter
+	goodscenter_two
 )

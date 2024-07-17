@@ -133,11 +133,13 @@ type MyRpcServer interface {
 }
 
 type MyTcpServer struct {
-	listener   net.Listener
-	Host       string
-	Port       int
-	Network    string
-	serviceMap map[string]interface{}
+	listener       net.Listener
+	Host           string
+	Port           int
+	Network        string
+	serviceMap     map[string]interface{}
+	RegisterType   string
+	RegisterOption register.Option
 }
 
 type MsTcpConn struct {
@@ -253,14 +255,28 @@ func (s *MyTcpServer) Register(name string, service interface{}) {
 	s.serviceMap[name] = service
 
 	//使用nacos进行注册
-	cli, err := register.CreateNacosClient()
-	if err != nil {
-		panic(err)
+	if s.RegisterType == "nacos" {
+		cli, err := register.CreateNacosClient()
+		if err != nil {
+			panic(err)
+		}
+		err = register.RegisterService(cli, name, s.Host, uint64(s.Port))
+		if err != nil {
+			panic(err)
+		}
 	}
-	err = register.RegisterService(cli, name, s.Host, uint64(s.Port))
-	if err != nil {
-		panic(err)
+	if s.RegisterType == "etcd" {
+		cli, err := register.CreateEtcdCli(s.RegisterOption)
+		if err != nil {
+			panic(err)
+		}
+		err = register.RegisterEtcdService(cli, name, s.Host, s.Port)
+		if err != nil {
+			panic(err)
+		}
+		cli.Close()
 	}
+
 }
 func (s *MyTcpServer) Run() {
 	addr := fmt.Sprintf("%s:%d", s.Host, s.Port)
@@ -603,8 +619,9 @@ type MyRpcClient interface {
 }
 
 type MyTcpClient struct {
-	conn   net.Conn
-	option TcpClientOption
+	conn        net.Conn
+	option      TcpClientOption
+	ServiceName string
 }
 
 type TcpClientOption struct {
@@ -614,11 +631,13 @@ type TcpClientOption struct {
 	CompressType      CompressType
 	Host              string
 	Port              int
+	RegisterType      string
+	RegisterOption    register.Option
 }
 
 var DefaultOption = TcpClientOption{
-	Host:              "127.0.0.1",
-	Port:              9222,
+	//Host:              "127.0.0.1",
+	//Port:              9222,
 	Retries:           3,
 	ConnectionTimeout: 5 * time.Second,
 	SerializeType:     Gob,
@@ -630,7 +649,35 @@ func NewTcpClient(option TcpClientOption) *MyTcpClient {
 }
 
 func (c *MyTcpClient) Connect() error {
-	addr := fmt.Sprintf("%s:%d", c.option.Host, c.option.Port)
+	//addr := fmt.Sprintf("%s:%d", c.option.Host, c.option.Port)
+	var addr string
+	//更改为从注册中心获取
+	if c.option.RegisterType == "nacos" {
+		cli, err := register.CreateNacosClient()
+		if err != nil {
+			panic(err)
+		}
+		//服务名
+		host, port, err := register.GetService(cli, c.ServiceName)
+		if err != nil {
+			panic(err)
+		}
+
+		addr = fmt.Sprintf("%s:%d", host, int(port))
+	}
+
+	if c.option.RegisterType == "etcd" {
+		cli, err := register.CreateEtcdCli(c.option.RegisterOption)
+		if err != nil {
+			panic(err)
+		}
+		addr, err = register.GetEtcdValue(cli, c.ServiceName)
+		if err != nil {
+			panic(err)
+		}
+		cli.Close()
+	}
+	fmt.Println(addr)
 	conn, err := net.DialTimeout("tcp", addr, c.option.ConnectionTimeout)
 	if err != nil {
 		return err
@@ -875,7 +922,9 @@ func NewMyTcpClientProxy(option TcpClientOption) *MyTcpClientProxy {
 
 func (p *MyTcpClientProxy) Call(ctx context.Context, serviceName string, methodName string, args []any) (any, error) {
 	client := NewTcpClient(p.option)
+	client.ServiceName = serviceName
 	p.client = client
+
 	err := client.Connect()
 	if err != nil {
 		return nil, err

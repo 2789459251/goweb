@@ -59,3 +59,16 @@ func RegisterService(namingClient naming_client.INamingClient, serviceName strin
 	return err
 
 }
+
+/*获取健康实例，加权轮训*/
+func GetService(namingClient naming_client.INamingClient, serviceName string) (host string, port uint64, err error) {
+	instance, err := namingClient.SelectOneHealthyInstance(vo.SelectOneHealthInstanceParam{
+		ServiceName: serviceName,
+		//GroupName:   "group-a",             // 默认值DEFAULT_GROUP
+		//Clusters:    []string{"cluster-a"}, // 默认值DEFAULT
+	})
+	if err != nil {
+		return "", uint64(0), err
+	}
+	return instance.Ip, instance.Port, nil
+}

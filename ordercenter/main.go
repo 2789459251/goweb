@@ -7,7 +7,9 @@ import (
 	"goodscenter/model"
 	"net/http"
 	service2 "ordercenter/service"
+	"time"
 	"web/zygo"
+	"web/zygo/register"
 	"web/zygo/rpc"
 )
 
@@ -72,6 +74,11 @@ func main() {
 
 		option := rpc.DefaultOption
 		option.SerializeType = rpc.ProtoBuff
+		option.RegisterType = "etcd"
+		option.RegisterOption = register.Option{
+			Endpoints:   []string{"127.0.0.1:2379"},
+			DialTimeout: 5 * time.Second,
+		}
 		proxy := rpc.NewMyTcpClientProxy(option)
 		//params := make([]any, 1)
 		//params[0] = int64(1)
