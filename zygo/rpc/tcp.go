@@ -17,6 +17,7 @@ import (
 	"reflect"
 	"sync/atomic"
 	"time"
+	"web/zygo/register"
 )
 
 //TCP 客户端 服务端
@@ -250,6 +251,16 @@ func (s *MyTcpServer) Register(name string, service interface{}) {
 		panic(errors.New("service not pointer"))
 	}
 	s.serviceMap[name] = service
+
+	//使用nacos进行注册
+	cli, err := register.CreateNacosClient()
+	if err != nil {
+		panic(err)
+	}
+	err = register.RegisterService(cli, name, s.Host, uint64(s.Port))
+	if err != nil {
+		panic(err)
+	}
 }
 func (s *MyTcpServer) Run() {
 	addr := fmt.Sprintf("%s:%d", s.Host, s.Port)

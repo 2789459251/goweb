@@ -57,7 +57,7 @@ func main() {
 
 	//3.tcp手写
 
-	tcpServer := rpc.NewTcpServer("localhost", 9222)
+	tcpServer := rpc.NewTcpServer("127.0.0.1", 9222)
 	gob.Register(&model.Result{})
 	gob.Register(&model.Goods{})
 	tcpServer.Register("goods", &service.GoodsRpcService{})
