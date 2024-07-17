@@ -4,6 +4,7 @@ use (
 	./blog
 	./zygo
 	goodscenter
-	ordercenter
 	goodscenter_two
+	ordercenter
+	mall-gateway
 )

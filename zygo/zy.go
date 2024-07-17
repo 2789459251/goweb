@@ -1,11 +1,15 @@
 package zygo
 
 import (
+	"fmt"
 	"html/template"
 	"log"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"sync"
 	"web/zygo/config"
+	"web/zygo/gateway"
 	"web/zygo/mylog"
 	"web/zygo/render"
 )
@@ -128,6 +132,20 @@ type Engine struct {
 	Logger       *mylog.Logger
 	middles      []MiddlewareFunc
 	errorHandler ErrorHandler
+	OpenGateway  bool
+	//维护网关的路径节点
+	gatewayTreeNode  *gateway.TreeNode
+	gatewayConfigMap map[string]gateway.GWConfig
+	gatewayConfigs   []gateway.GWConfig
+}
+
+func (e *Engine) SetGateConfigs(configs []gateway.GWConfig) {
+	e.gatewayConfigs = configs
+	//存储路径 如果符合就匹配
+	for _, v := range e.gatewayConfigs {
+		e.gatewayTreeNode.Put(v.Path, v.Name)
+		e.gatewayConfigMap[v.Name] = v
+	}
 }
 
 func Default() *Engine {
@@ -152,7 +170,9 @@ func (e *Engine) Use(middles ...MiddlewareFunc) {
 
 func New() *Engine {
 	engine := &Engine{
-		router: router{},
+		router:           router{},
+		gatewayTreeNode:  &gateway.TreeNode{Name: "/", Children: make([]*gateway.TreeNode, 0)},
+		gatewayConfigMap: make(map[string]gateway.GWConfig, 0),
 	}
 	engine.pool.New = func() interface{} {
 		return engine.allocateContext()
@@ -195,7 +215,47 @@ func (e *Engine) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	e.httpRequestHandle(ctx, w, r)
 	e.pool.Put(ctx)
 }
+
+/*加入网关时逻辑修改 找到目标 对应替换*/
 func (e *Engine) httpRequestHandle(ctx *Context, w http.ResponseWriter, r *http.Request) {
+	if e.OpenGateway {
+		//req -> 网关 -> 配置分发
+		path := r.URL.Path
+		node := e.gatewayTreeNode.Get(path)
+		if node == nil {
+			ctx.W.WriteHeader(http.StatusNotFound)
+			fmt.Fprintln(ctx.W, ctx.R.RequestURI+" not found")
+			return
+		}
+		gwConfig := e.gatewayConfigMap[node.GwName]
+		target, err := url.Parse(fmt.Sprintf("http://%s:%d%s", gwConfig.Host, gwConfig.Port, path))
+		if err != nil {
+			ctx.W.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintln(ctx.W, err.Error())
+		}
+		//网关处理逻辑
+		director := func(req *http.Request) {
+			req.Host = target.Host
+			req.URL.Host = target.Host
+			req.URL.Path = target.Path
+			req.URL.Scheme = target.Scheme
+			if _, ok := req.Header["User-Agent"]; !ok {
+				req.Header.Set("User-Agent", "")
+			}
+		}
+		response := func(response *http.Response) error {
+			log.Println("响应修改")
+			return nil
+		}
+		handler := func(writer http.ResponseWriter, request *http.Request, err error) {
+			log.Println("错误处理：" + err.Error())
+		}
+		proxy := httputil.ReverseProxy{Director: director, ModifyResponse: response, ErrorHandler: handler}
+		//代理帮我转发
+		proxy.ServeHTTP(ctx.W, ctx.R)
+		return
+	}
+
 	method := r.Method
 
 	for _, group := range e.routerGroups {
@@ -219,7 +279,7 @@ func (e *Engine) httpRequestHandle(ctx *Context, w http.ResponseWriter, r *http.
 		return
 	}
 }
-func (e *Engine) Run(port string, handler http.Handler) (err error) {
+func (e *Engine) Run(addr string) {
 
 	/*	for _, group := range e.routerGroups {
 			for key, value := range group.handlerFuncMap {
@@ -228,8 +288,10 @@ func (e *Engine) Run(port string, handler http.Handler) (err error) {
 		}
 	*/
 	http.Handle("/", e)
-	err = http.ListenAndServe(port, handler)
-	return
+	err := http.ListenAndServe(addr, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 func (e *Engine) RunTLS(addr, certFile, keyFile string) {
