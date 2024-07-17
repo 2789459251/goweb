@@ -2,8 +2,8 @@ package main
 
 import (
 	"context"
+	"encoding/gob"
 	"encoding/json"
-	"goodscenter/api"
 	"goodscenter/model"
 	"net/http"
 	service2 "ordercenter/service"
@@ -13,6 +13,8 @@ import (
 
 func main() {
 	r := zygo.Default()
+
+	//http调用
 	cli := rpc.NewHttpClient()
 	cli.RegisterHttpService("goods", &service2.GoodsService{})
 	group := r.Group("order")
@@ -42,7 +44,8 @@ func main() {
 	})
 
 	group.GET("/findGRPC", func(ctx *zygo.Context) {
-		var serviceHost = "127.0.0.1:9111"
+		//var serviceHost = "127.0.0.1:9111"
+		/*1.grpc*/
 		//conn, err := grpc.Dial(serviceHost, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		//if err != nil {
 		//	fmt.Println(err)
@@ -55,14 +58,36 @@ func main() {
 		//if err != nil {
 		//	fmt.Println(err)
 		//}
-		Config := rpc.DefaultGrpcClientConfig()
-		Config.Address = serviceHost
-		client, _ := rpc.NewGrpcClient(Config)
-		defer client.Conn.Close()
 
-		goodsApiClient := api.NewGoodsApiClient(client.Conn)
-		rsp, _ := goodsApiClient.Find(context.Background(), &api.GoodsRequest{})
-		ctx.JSON(http.StatusOK, rsp)
+		/*2.封装grpc*/
+		//Config := rpc.DefaultGrpcClientConfig()
+		//Config.Address = serviceHost
+		//client, _ := rpc.NewGrpcClient(Config)
+		//defer client.Conn.Close()
+		//
+		//goodsApiClient := api.NewGoodsApiClient(client.Conn)
+		//rsp, _ := goodsApiClient.Find(context.Background(), &api.GoodsRequest{})
+
+		/*3.基于tcp实现的rpc*/
+
+		option := rpc.DefaultOption
+		option.SerializeType = rpc.ProtoBuff
+		proxy := rpc.NewMyTcpClientProxy(option)
+		//params := make([]any, 1)
+		//params[0] = int64(1)
+		////todo 调用方法完善
+		//->这样的 body, err := cli.Do("goods", "Find").(*service2.GoodsService).Find(params)
+		//result, err := proxy.Call(context.Background(), "goods", "Find", params)
+		//log.Panicln(err)
+		gob.Register(&model.Result{})
+		gob.Register(&model.Goods{})
+		args := make([]any, 1)
+		args[0] = 1
+		result, err := proxy.Call(context.Background(), "goods", "Find", args)
+		if err != nil {
+			panic(err)
+		}
+		ctx.JSON(http.StatusOK, result)
 	})
 	r.Run(":9003", nil)
 }

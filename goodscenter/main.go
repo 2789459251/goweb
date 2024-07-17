@@ -1,9 +1,13 @@
 package main
 
 import (
+	"encoding/gob"
 	"goodscenter/model"
 	"goodscenter/service"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 	"web/zygo"
 	"web/zygo/rpc"
 )
@@ -54,7 +58,18 @@ func main() {
 	//3.tcp手写
 
 	tcpServer := rpc.NewTcpServer("localhost", 9222)
-	tcpServer.Register("goods", service.GoodsRpcService{})
-	tcpServer.Run()
-	r.Run(":9002", nil)
+	gob.Register(&model.Result{})
+	gob.Register(&model.Goods{})
+	tcpServer.Register("goods", &service.GoodsRpcService{})
+	go tcpServer.Run()
+	go r.Run(":9002", nil)
+	quit := make(chan os.Signal)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGQUIT)
+	<-quit
+	tcpServer.Close()
+	//
+	//tcpServer := rpc.NewTcpServer("localhost", 9222)
+	//tcpServer.Register("goods", &service.GoodsRpcService{})
+	//tcpServer.Run()
+	//r.Run(":9002", nil)
 }
