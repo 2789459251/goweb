@@ -120,6 +120,8 @@ func main() {
 	if err != nil {
 		return
 	}
+	tcpServer.SetLimiter(1, 1)
+	tcpServer.LimiterTimeout = 1
 	cli.RegisterService("goodsCenter", "127.0.0.1", 9002)
 	go tcpServer.Run()
 	go r.Run(":9002")

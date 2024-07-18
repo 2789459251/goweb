@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"golang.org/x/time/rate"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
 	"io"
@@ -141,6 +142,8 @@ type MyTcpServer struct {
 	RegisterType   string
 	RegisterOption register.Option
 	RegisterCli    register.MyRegister
+	LimiterTimeout time.Duration
+	Limiter        *rate.Limiter
 }
 
 type MsTcpConn struct {
@@ -245,6 +248,13 @@ func NewTcpServer(host string, port int) *MyTcpServer {
 		Network: "tcp",
 	}
 }
+
+/*设置限流器 参数：每秒放入令牌数 、木桶容量*/
+func (s *MyTcpServer) SetLimiter(limit, cap int) {
+	s.Limiter = rate.NewLimiter(rate.Limit(limit), cap)
+}
+
+// 设置服务注册
 func (s *MyTcpServer) SetRegister(registerType string, option register.Option) {
 	s.RegisterType = registerType
 	s.RegisterOption = option
@@ -352,6 +362,18 @@ func (s *MyTcpServer) readHandle(msConn *MsTcpConn) {
 			msConn.conn.Close()
 		}
 	}()
+	//加入限流  - > 构建限流器
+	ctx, cancel := context.WithTimeout(context.Background(), s.LimiterTimeout*time.Second)
+	defer cancel()
+	err3 := s.Limiter.WaitN(ctx, 1)
+	if err3 != nil {
+		rsp := &MyRpcResponse{}
+		rsp.Code = 700 //限流的错误
+		rsp.Msg = err3.Error()
+		log.Println("接收数据出错，服务方法调用出错")
+		msConn.rspChan <- rsp
+		return
+	}
 	//解码请求
 	msg := decodeFrame(msConn.conn)
 	if msg == nil {
