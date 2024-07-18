@@ -17,6 +17,7 @@ import (
 
 func main() {
 	r := zygo.Default()
+	r.Use(zygo.Limiter(1, 1))
 	group := r.Group("goods")
 	group.GET("/find", func(ctx *zygo.Context) {
 		v := ctx.GetHeader("zy")
