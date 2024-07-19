@@ -3,8 +3,13 @@ package main
 import (
 	"errors"
 	"github.com/nacos-group/nacos-sdk-go/common/constant"
+	"github.com/opentracing/opentracing-go"
+	"github.com/uber/jaeger-client-go"
+	"github.com/uber/jaeger-client-go/config"
 	"goodscenter/model"
 	"log"
+	"web/zygo/tracer"
+
 	"net/http"
 	"web/zygo"
 	"web/zygo/breaker"
@@ -14,11 +19,37 @@ import (
 func main() {
 	r := zygo.Default()
 	//r.Use(zygo.Limiter(1, 1))
+	set := breaker.Settings{Fallback: func(err error) (any, error) {
+		goods := &model.Goods{ID: 666, Name: "降级的商品"}
+		return goods, nil
+	}}
+	createTracer, closer, err := tracer.CreateTracer("goodsCenter",
+		&config.SamplerConfig{
+			Type:  jaeger.SamplerTypeConst,
+			Param: 1,
+		},
+		&config.ReporterConfig{
+			LogSpans:          true,
+			CollectorEndpoint: "http://127.0.0.1:14268/api/traces",
+		}, config.Logger(jaeger.StdLogger),
+	)
+	if err != nil {
+		log.Println(err)
+	}
+	defer closer.Close()
+	var cb = breaker.NewCircuitBreaker(set)
 
-	var cb = breaker.NewCircuitBreaker(breaker.Settings{})
 	group := r.Group("goods")
+	group.Use(zygo.Tracer("goodsCenter", &config.SamplerConfig{
+		Type:  jaeger.SamplerTypeConst,
+		Param: 1,
+	},
+		&config.ReporterConfig{
+			LogSpans:          true,
+			CollectorEndpoint: "http://127.0.0.1:14268/api/traces",
+		}, config.Logger(jaeger.StdLogger)))
 	group.GET("/find", func(ctx *zygo.Context) {
-		result, err := cb.Execute(func() (any, error) {
+		result, _ := cb.Execute(func() (any, error) {
 			//网关可以配置header信息
 			//v := ctx.GetHeader("zy")
 			//fmt.Println("get zygo" + v)
@@ -50,14 +81,14 @@ func main() {
 
 			return good, nil
 		})
-		if err != nil {
-			log.Println(err)
-			ctx.JSON(http.StatusInternalServerError, &model.Result{
-				Code: 500,
-				Msg:  err.Error(),
-			})
-			return
-		}
+		//if err != nil {
+		//	log.Println(err)
+		//	ctx.JSON(http.StatusInternalServerError, &model.Result{
+		//		Code: 500,
+		//		Msg:  err.Error(),
+		//	})
+		//	return
+		//}
 		ctx.JSON(http.StatusOK, &model.Result{
 			Code: 200,
 			Msg:  "succeess",
@@ -65,6 +96,7 @@ func main() {
 		})
 
 	})
+
 	group.POST("/find", func(ctx *zygo.Context) {
 		good := &model.Goods{
 			ID:   1,
@@ -75,6 +107,15 @@ func main() {
 			Msg:  "succeess",
 			Data: good,
 		})
+	})
+	//单机 jaeger
+	group.GET("/findTracer", func(ctx *zygo.Context) {
+
+		goods := model.Goods{ID: 1000, Name: "商品中心9002findTracer商品"}
+		span := createTracer.StartSpan("findGoods")
+		defer span.Finish()
+		B(createTracer, span)
+		ctx.JSON(http.StatusOK, &model.Result{Code: 200, Msg: "success", Data: goods})
 	})
 
 	//1.grpc
@@ -152,4 +193,10 @@ func main() {
 	//tcpServer.Run()
 	//r.Run(":9002", nil)
 
+}
+func B(t opentracing.Tracer, p opentracing.Span) {
+	//这是B服务
+	log.Println("B...")
+	span := t.StartSpan("B", opentracing.ChildOf(p.Context()))
+	defer span.Finish()
 }

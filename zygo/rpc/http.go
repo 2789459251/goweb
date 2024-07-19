@@ -34,9 +34,9 @@ func NewHttpClient() *MyHttpClient {
 	return &MyHttpClient{client: client, ServicesMap: make(map[string]MyService)} //请求分发，协程安全
 
 }
-func (c *MyHttpClient) Get(url string, args map[string]any) ([]byte, error) {
+func (s *MyHttpClientSession) Get(url string, args map[string]any) ([]byte, error) {
 	if args != nil && len(args) > 0 {
-		url = url + "?" + c.toValues(args)
+		url = url + "?" + s.toValues(args)
 	}
 	log.Println(url)
 	//req := &http.Request{}
@@ -44,14 +44,18 @@ func (c *MyHttpClient) Get(url string, args map[string]any) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	//
 	//response, err := cli.Do(req)
 	//body := response.Body
 	//bufio.NewReader(body)
-	return c.responsehandle(req)
+	return s.responsehandle(req)
 }
 
-func (c *MyHttpClient) responsehandle(req *http.Request) ([]byte, error) {
-	resp, err := c.client.Do(req)
+func (s *MyHttpClientSession) responsehandle(req *http.Request) ([]byte, error) {
+	s.ReqHandler(req)
+	//在调用之前  session设置jaeger 信息header
+	resp, err := s.MyHttpClient.client.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -89,25 +93,25 @@ func (*MyHttpClient) toValues(args map[string]any) string {
 	}
 	return ""
 }
-func (c *MyHttpClient) PostForm(url string, args map[string]any) ([]byte, error) {
-	req, err := http.NewRequest("POST", url, strings.NewReader(c.toValues(args)))
+func (s *MyHttpClientSession) PostForm(url string, args map[string]any) ([]byte, error) {
+	req, err := http.NewRequest("POST", url, strings.NewReader(s.toValues(args)))
 	if err != nil {
 		return nil, err
 	}
-	return c.responsehandle(req)
+	return s.responsehandle(req)
 }
-func (c *MyHttpClient) PostJson(url string, args map[string]any) ([]byte, error) {
+func (s *MyHttpClientSession) PostJson(url string, args map[string]any) ([]byte, error) {
 	marshal, _ := json.Marshal(args)
 	req, err := http.NewRequest("POST ", url, bytes.NewReader(marshal))
 	if err != nil {
 		return nil, err
 	}
-	return c.responsehandle(req)
+	return s.responsehandle(req)
 }
 
-func (c *MyHttpClient) GetRequest(method string, url string, args map[string]any) (*http.Request, error) {
+func (s *MyHttpClientSession) GetRequest(method string, url string, args map[string]any) (*http.Request, error) {
 	if args != nil && len(args) > 0 {
-		url = url + "?" + c.toValues(args)
+		url = url + "?" + s.toValues(args)
 	}
 	req, err := http.NewRequest(method, url, nil)
 	if err != nil {
@@ -123,8 +127,8 @@ func (c *MyHttpClient) FormRequest(method string, url string, args map[string]an
 	}
 	return req, nil
 }
-func (c *MyHttpClient) Response(req *http.Request) ([]byte, error) {
-	return c.responsehandle(req)
+func (s *MyHttpClientSession) Response(req *http.Request) ([]byte, error) {
+	return s.responsehandle(req)
 }
 
 func (c *MyHttpClient) JsonRequest(method string, url string, args map[string]any) (*http.Request, error) {
@@ -158,8 +162,23 @@ type MyService interface {
 func (c *MyHttpClient) RegisterHttpService(name string, service MyService) {
 	c.ServicesMap[name] = service
 }
-func (c *MyHttpClient) Do(service string, method string) MyService {
-	myService, ok := c.ServicesMap[service]
+
+type MyHttpClientSession struct {
+	*MyHttpClient
+	ReqHandler func(req *http.Request)
+}
+
+func (c *MyHttpClient) NewSession() *MyHttpClientSession {
+	return &MyHttpClientSession{
+		c,
+		nil,
+	}
+}
+
+// A 调用 B服务
+func (s *MyHttpClientSession) Do(service string, method string) MyService {
+
+	myService, ok := s.MyHttpClient.ServicesMap[service]
 	if !ok {
 		panic(errors.New("service " + service + " not exist"))
 	}
@@ -196,13 +215,13 @@ func (c *MyHttpClient) Do(service string, method string) MyService {
 	httpConfig := myService.Env()
 	f := func(args map[string]any) ([]byte, error) {
 		if methodType == GET {
-			return c.Get(httpConfig.Prefix()+path, args)
+			return s.Get(httpConfig.Prefix()+path, args)
 		}
 		if methodType == POSTForm {
-			return c.PostForm(httpConfig.Prefix()+path, args)
+			return s.PostForm(httpConfig.Prefix()+path, args)
 		}
 		if methodType == POSTJson {
-			return c.PostJson(httpConfig.Prefix()+path, args)
+			return s.PostJson(httpConfig.Prefix()+path, args)
 		}
 		return nil, errors.New("no match method type")
 	}

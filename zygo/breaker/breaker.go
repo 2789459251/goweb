@@ -360,6 +360,7 @@ type Settings struct {
 	ReadyToTrip   func(counts Counts) bool                //执行熔断
 	OnStateChange func(name string, from State, to State) //状态变更
 	IsSuccessful  func(err error) bool                    //是否成功
+	Fallback      func(err error) (any, error)
 }
 
 // CircuitBreaker 断路器
@@ -371,12 +372,12 @@ type CircuitBreaker struct {
 	readyToTrip   func(counts Counts) bool                //是否执行熔断
 	isSuccessful  func(err error) bool                    //是否成功
 	onStateChange func(name string, from State, to State) //状态变更
-
-	mutex      sync.Mutex
-	state      State     //状态
-	generation uint64    //代 状态变更 new一个
-	counts     Counts    //数量
-	expiry     time.Time //到期时间 检查是否从开到半开
+	Fallback      func(err error) (any, error)            //降级方法
+	mutex         sync.Mutex
+	state         State     //状态
+	generation    uint64    //代 状态变更 new一个
+	counts        Counts    //数量
+	expiry        time.Time //到期时间 检查是否从开到半开
 }
 
 func NewCircuitBreaker(st Settings) *CircuitBreaker {
@@ -384,7 +385,7 @@ func NewCircuitBreaker(st Settings) *CircuitBreaker {
 
 	cb.name = st.Name
 	cb.onStateChange = st.OnStateChange
-
+	cb.Fallback = st.Fallback
 	if st.MaxRequests == 0 {
 		cb.maxRequests = 1
 	} else {
@@ -458,6 +459,10 @@ func (cb *CircuitBreaker) Counts() Counts {
 func (cb *CircuitBreaker) Execute(req func() (any, error)) (any, error) {
 	generation, err := cb.beforeRequest()
 	if err != nil {
+		//发生错误，设置降级方法，执行
+		if cb.Fallback != nil {
+			return cb.Fallback(err)
+		}
 		return nil, err
 	}
 

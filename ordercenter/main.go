@@ -5,13 +5,19 @@ import (
 	"encoding/gob"
 	"encoding/json"
 	"github.com/nacos-group/nacos-sdk-go/common/constant"
+	"github.com/opentracing/opentracing-go"
+	"github.com/opentracing/opentracing-go/ext"
+	"github.com/uber/jaeger-client-go"
+	"github.com/uber/jaeger-client-go/config"
 	"goodscenter/model"
+	"log"
 	"net/http"
 	service2 "ordercenter/service"
 	"time"
 	"web/zygo"
 	"web/zygo/register"
 	"web/zygo/rpc"
+	"web/zygo/tracer"
 )
 
 func main() {
@@ -21,6 +27,20 @@ func main() {
 	cli := rpc.NewHttpClient()
 	cli.RegisterHttpService("goods", &service2.GoodsService{})
 	group := r.Group("order")
+	createTracer, closer, err := tracer.CreateTracer("orderCenter",
+		&config.SamplerConfig{
+			Type:  jaeger.SamplerTypeConst,
+			Param: 1,
+		},
+		&config.ReporterConfig{
+			LogSpans:          true,
+			CollectorEndpoint: "http://127.0.0.1:14268/api/traces",
+		}, config.Logger(jaeger.StdLogger),
+	)
+	if err != nil {
+		log.Println(err)
+	}
+	defer closer.Close()
 	group.GET("/find", func(ctx *zygo.Context) {
 		//调用商品模块
 		//http -> 调用
@@ -37,7 +57,16 @@ func main() {
 		//	return
 		//}
 		//log.Println(string(body))
-		body, err := cli.Do("goods", "Find").(*service2.GoodsService).Find(params)
+		span := createTracer.StartSpan("find")
+		defer span.Finish()
+		session := cli.NewSession()
+
+		session.ReqHandler = func(req *http.Request) {
+			ext.SpanKindRPCClient.Set(span)
+			//携带信息
+			createTracer.Inject(span.Context(), opentracing.HTTPHeaders, opentracing.HTTPHeadersCarrier(req.Header))
+		}
+		body, err := session.Do("goods", "Find").(*service2.GoodsService).Find(params)
 		if err != nil {
 			panic(err)
 		}
